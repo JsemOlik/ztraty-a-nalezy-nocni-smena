@@ -6,25 +6,21 @@ from ..state import GameState
 TITLE = "Místnost nehledaných věcí"
 
 
+def no_travel(state: GameState) -> bool:
+    return True
+
+
 def _talk(state: GameState, ui) -> None:
-    ui.say(
-        "„Dobrý večer… nebo ráno? Já… byl jsem tu úředníkem? Nebo jsem byl něco, co někdo ztratil?“ "
-        "Muž se na tebe dívá skrz vlastní průsvitné ruce. „Ztratil jsem něco hrozně důležitého. "
-        "Myslím, že sebe. Kdybych aspoň věděl, jak se jmenuju…“"
-    )
+    ui.say("„Byl jsem tu úředníkem? Nebo jsem něco, co někdo ztratil?“ Muž se dívá skrz vlastní ruce. „Kdybych aspoň věděl, jak se jmenuju…“")
 
 
 def _give_nametag(state: GameState, ui) -> None:
     state.remove_item("nametag")
     state.flags.add("hlavacek_found")
-    ui.good(
-        "Podáš mu jmenovku. Přečte si ji – jednou, dvakrát, potřetí nahlas: „Bohumil Hlaváček. Noční služba.“ "
-        "A s každým slovem mu do tváře, do saka a do rukou stéká barva, jako když se do čaje nalije mléko."
-    )
+    ui.good("Podáš mu jmenovku. „Bohumil Hlaváček!“ přečte nahlas a do tváře se mu vrací barva.")
     ui.say(
-        "„Hlaváček! No ovšem! Bohouš!“ Smeká neexistující klobouk. „Děkuju vám. Kdo ztratil sám sebe, "
-        "potřebuje, aby mu někdo připomněl, kdo je.“ Pak se na tebe podívá zkoumavě. „A vy… vy jste tu taky "
-        f"{state.g('nebyl', 'nebyla')} jen tak náhodou, viďte? Sem berou jen ty, kdo něco ztratili.“"
+        f"„Děkuju. A vy… vy jste tu taky {state.g('nebyl', 'nebyla')} jen tak náhodou, viďte? "
+        "Sem berou jen ty, kdo něco ztratili.“"
     )
 
 
@@ -36,48 +32,33 @@ def _search_box(state: GameState, ui) -> None:
     if state.has("own_photo"):
         state.ending = "lost_and_found"
         return
-    if "photo_used" in state.flags:
-        ui.say(
-            "Hledáš krabici se svým jménem, ale krabic se jmény jsou tu tisíce a všechna jména vybledla. "
-            f"Kdyby sis jen {state.g('pamatoval', 'pamatovala')}, jak vypadáš – ale fotka, "
-            f"kterou jsi {state.g('měl', 'měla')}, už je jen bílý papír."
-        )
-        return
-    ui.say(
-        "Hledáš krabici se svým jménem, ale krabic se jmény jsou tu tisíce a všechna jména vybledla. "
-        f"{state.g('Potřeboval', 'Potřebovala')} bys něco, podle čeho se poznáš. Třeba tu fotku ze spisu."
-    )
+    reason = "fotka už je jen bílý papír" if "photo_used" in state.flags else "nemáš u sebe svou fotku"
+    ui.say(f"Krabic se jmény jsou tu tisíce a všechny vybledly. Tu svou bez fotky nepoznáš – a {reason}.")
 
 
 def _back(state: GameState, ui) -> None:
     state.location = "threads"
-    ui.say("Navineš si nit kolem prstu a jdeš po ní zpátky. Za rohem, který tam předtím nebyl, je zase archiv.")
+    ui.say("Jdeš po niti zpátky do archivu.")
 
 
 def describe(state: GameState) -> str:
-    parts = [
-        "Místnost nemá strop. Shora sem pomalu, jako sníh, padají věci: rukavice, dopisy, dětské kresby, "
-        "sliby, staré přezdívky, jména kamarádů ze školy. Všechno, co už nikdo nehledá. Hromady sahají "
-        "do nedohledna a všechno vybledlo do barvy starého papíru. Kdo tu zůstane, vybledne taky."
-    ]
+    parts = ["Místnost bez stropu. Shora sem jako sníh padají věci, které už nikdo nehledá, a všechno tu bledne."]
     if "hlavacek_found" in state.flags:
-        parts.append("Pan Hlaváček stojí vedle tebe, zase barevný, a nervózně si leští jmenovku rukávem.")
+        parts.append("Pan Hlaváček stojí vedle tebe, zase barevný, a leští si jmenovku.")
     else:
-        parts.append(
-            "Mezi hromadami sedí muž v úředním saku. Je skoro průhledný; skrz jeho hruď vidíš padat sníh věcí. "
-            "Šeptem si opakuje: „Jak se to… jak se to jmenuju…“ Pan Hlaváček."
-        )
+        parts.append("Mezi hromadami sedí skoro průhledný muž v úředním saku. Pan Hlaváček.")
     if "read_own_file" in state.flags:
-        parts.append("Někde tady, mezi tisíci krabicemi, je i krabice s tvým jménem.")
+        parts.append("Někde tady je i krabice s tvým jménem.")
     return "\n".join(parts)
 
 
 def actions(state: GameState) -> list[Action]:
     result = []
     if "hlavacek_found" not in state.flags:
-        result.append(Action("talk_hlavacek", "Promluvit s blednoucím mužem", _talk))
         if state.has("nametag"):
             result.append(Action("give_nametag", "Dát mu Hlaváčkovu jmenovku", _give_nametag))
+        else:
+            result.append(Action("talk_hlavacek", "Promluvit s ním", _talk))
     else:
         if "read_own_file" in state.flags:
             result.append(Action("search_box", "Hledat krabici se svým jménem", _search_box))

@@ -14,7 +14,7 @@ GENERAL = [
 
 BY_LOCATION = {
     "counter": [
-        "Ten zvonek. Nezvoňte na ten zvonek. Pokaždé když zvoní, něco se probudí.",
+        "Ten čaj na přepážce. Pan Hlaváček ho nikdy nedopil. To je špatné znamení, že?",
         "Pan Hlaváček tu sedával a luštil křížovky. Pak šel dolů. Dolů se nechodí!",
     ],
     "umbrellas": [

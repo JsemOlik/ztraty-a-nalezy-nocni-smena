@@ -1,40 +1,27 @@
 """Sklad deštníků – uvnitř pořád prší."""
 
-from ..actions import Action, go
+from ..actions import Action, lose_piece
 from ..state import GameState
 
-# Předměty, které popisuje už sama místnost.
-NATIVE_ITEMS = ("head",)
 TITLE = "Sklad deštníků"
+NATIVE_ITEMS = ("head",)
 
 
-def _look_umbrellas(state: GameState, ui) -> None:
-    ui.say(state.rng.choice([
-        "Jeden deštník má na rukojeti vyryto „Pro Marii, ať nezmokne“. Prší z něj teplý letní déšť.",
-        "Dětský deštník s kachničkami. Kape z něj jarní přeháňka a voní to po bahnitých loužích.",
-        "Pánský deštník z roku 1968. Prší z něj tak smutně, že se radši podíváš jinam.",
-        "Deštník z tramvaje číslo 22. Prší z něj přesně v okamžiku, kdy by člověk vystupoval.",
-    ]))
+def enter(state: GameState, ui) -> None:
+    state.location = "umbrellas"
+    ui.sfx("Šššššššššš…")
+    if state.has("umbrella"):
+        ui.say("Rozevřeš suchý deštník. Na tebe nedopadne ani kapka.")
+    else:
+        lose_piece(state, ui, "Vejdeš bez deštníku a spustí se na tebe liják. Ten déšť z tebe smývá kus tebe samotného.")
 
 
 def describe(state: GameState) -> str:
-    parts = [
-        "Ve skladu deštníků prší. Ne venku – tady uvnitř. Ze stropu, z regálů, z vlastních deštníků. "
-        "Každý zapomenutý deštník si s sebou přinesl své počasí: mrholení z Vršovic, slejvák ze Zlína, "
-        "studenou listopadovou plískanici odněkud z nádraží. Podlaha je jedna velká louže."
-    ]
+    parts = ["Ve skladu prší – přímo uvnitř. Každý zapomenutý deštník si s sebou přinesl své počasí."]
     if "head" in state.here():
-        parts.append(
-            "Uprostřed, na jediném suchém ostrůvku, stojí kulatá krabice na klobouk. Z krabice se ozývá hlas: "
-            "„Haló? Je tam někdo? Prší sem? Já nesnáším déšť! Mám mokrý knír!“"
-        )
-    else:
-        parts.append("Na suchém ostrůvku zbyla prázdná krabice na klobouk.")
+        parts.append("Na suchém ostrůvku stojí krabice na klobouk a v ní hlava: „Haló? Je tam někdo? Mám mokrý knír!“")
     return "\n".join(parts)
 
 
 def actions(state: GameState) -> list[Action]:
-    return [
-        Action("look_umbrellas", "Prohlédnout si deštníky", _look_umbrellas),
-        Action("back", "Vrátit se k přepážce", go("counter")),
-    ]
+    return []

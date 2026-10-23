@@ -32,17 +32,20 @@ Když výstup nejde do terminálu (třeba při přesměrování do souboru), ani
 
 ## Jak se hraje
 
-- Akce vybíráš zadáním čísla. Každá akce zabere **5 minut**. Šedé akce (rozhlédnout se, nápověda, kapsy) jsou zadarmo.
-- Směna začíná o půlnoci a v **6:00** přijde denní směna. V oddělení ztraceného času se dá získat *ztracená hodina*, která noc o hodinu prodlouží.
-- Máš pět **kousků sebe**. S každou chybou trochu zprůhledníš. Když přijdeš o všechny, úplně se ztratíš.
-- Do kapes saka se vejdou jen **čtyři** věci.
-- Hádanky stojí na tom, že česká rčení platí doslova. Kdo ztratil hlavu, potřebuje ji vrátit. Kdo ztratil nit, musí jít po niti.
-- Když nevíš kudy kam, zvedni u přepážky telefon.
+- **Cíl:** najdi pana Hlaváčka do 6:00 ráno. Nahoře na obrazovce je vždy **Úkol**, co dělat dál.
+- Napiš číslo volby a Enter. Každá akce zabere **5 minut**. Klávesy **n** (nápověda), **r** (rychlost textu) a **k** (konec) fungují kdykoli.
+- Máš pět **kousků sebe** (●). Chybami průhledníš; když přijdeš o všechny, ztratíš se.
+- Do kapes se vejdou jen **čtyři** věci. Když jsou plné, hra se zeptá, co odložit.
+- Rčení tu platí doslova: kdo ztratil hlavu, musí ji dostat zpátky. Kdo ztratil nit, jde po niti.
 
-Hra má **osm konců**. Některé jsou vtipné, některé temné a jeden je tajný.
+Hra se vejde do jedné obrazovky a každý tah ji překreslí na místě. Po skončení se terminál vrátí do původního stavu. Hra má **osm konců** – některé vtipné, některé temné a jeden tajný.
 
 ## Testy
 
 ```bash
 python3 -m unittest
 ```
+
+## Autor
+
+Tvorba: Oliver Steiner · [jsemolik.dev](https://jsemolik.dev)

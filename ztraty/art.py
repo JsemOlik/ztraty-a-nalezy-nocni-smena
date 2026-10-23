@@ -17,6 +17,10 @@ TITLE = r"""
 
 SUBTITLE = "~ noční směna ~"
 
+CREDITS_LABEL = "Tvorba:"
+CREDITS_NAME = "Oliver Steiner"
+CREDITS_SITE = "jsemolik.dev"
+
 ROOMS = {
     "counter": r"""
               _

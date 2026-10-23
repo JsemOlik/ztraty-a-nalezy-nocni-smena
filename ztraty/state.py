@@ -11,7 +11,7 @@ ACTION_MINUTES = 5
 
 def _initial_room_items() -> dict[str, list[str]]:
     return {
-        "counter": ["umbrella", "storage_key"],
+        "counter": ["umbrella"],
         "umbrellas": ["head"],
         "time_dept": [],
         "speech": [],

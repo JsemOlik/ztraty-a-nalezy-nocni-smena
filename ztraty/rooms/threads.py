@@ -1,79 +1,53 @@
 """Archiv ztracených nití – klubka lidí, kteří ztratili nit."""
 
-from ..actions import Action, go, lose_piece
+from ..actions import Action, lose_piece, make_room
 from ..state import ACTION_MINUTES, GameState
 
-# Předměty, které popisuje už sama místnost.
-NATIVE_ITEMS = ("red_thread",)
 TITLE = "Archiv ztracených nití"
+NATIVE_ITEMS = ("red_thread",)
 
 LOST_PENALTY = 30
 
 WRONG_THREADS = {
-    "blue": (
-        "modré",
-        "Modrá nit tě vede do cizí přednášky o termodynamice, kterou kdosi před čtyřiceti lety nedořekl. "
-        "Bloudíš mezi nedokončenými větami a vzorci, až zapomeneš, proč jsi sem vůbec {went}.",
-    ),
-    "grey": (
-        "šedé",
-        "Šedá nit vede do nekonečné porady. Někdo tu kdysi ztratil nit uprostřed bodu sedm „Různé“. "
-        "Bod sedm trvá dodnes a ty v něm sedíš celou věčnost, než se ti podaří odplížit.",
-    ),
-    "gold": (
-        "zlaté",
-        "Zlatá nit tě dovede do něčího nedokončeného snu o bohatství. Zlato se ti drolí pod prsty "
-        "a cesta zpátky se pořád stáčí do kruhu.",
-    ),
+    "blue": ("modré", "Modrá nit vede do cizí nedokončené přednášky o termodynamice. Bloudíš v ní celou věčnost."),
+    "gold": ("zlaté", "Zlatá nit vede do něčího snu o bohatství. Cesta zpátky se pořád stáčí do kruhu."),
 }
 
 
-def _follow_red(state: GameState, ui) -> None:
+def _follow_red(state: GameState, ui) -> int | None:
     if not state.has("red_thread"):
-        ui.say(
-            f"Vydáš se podél červené niti, ale bez toho, abys ji {state.g('držel', 'držela')} v ruce, "
-            "se ti po pár krocích ztratí ve tmě. Kdo jde po niti, musí ji držet. Vrátíš se."
-        )
-        return
+        if not make_room(state, ui):
+            ui.say("Kdo jde po niti, musí ji držet. Bez volné kapsy to nepůjde.")
+            return 0
+        state.here().remove("red_thread")
+        state.add_item("red_thread")
     state.location = "hidden"
-    ui.say(
-        "Pevně sevřeš červenou nit a jdeš. Nit vede mezi regály, pak zdí, která se rozestoupí, pak chodbou, "
-        "která není na žádném plánku. Je tu ticho a pomalu tu sněží."
-    )
+    ui.say("Sevřeš červenou nit a jdeš. Zeď se rozestoupí a nit tě vede chodbou, která není na žádném plánku.")
+    return None
 
 
 def _follow_wrong(color: str):
     genitive, text = WRONG_THREADS[color]
 
     def handler(state: GameState, ui) -> int:
-        ui.say(f"Chytíš se {genitive} niti a vydáš se za ní.")
-        lose_piece(state, ui, text.format(went=state.g("šel", "šla")))
-        state.location = "threads"
-        ui.say("Když se konečně vymotáš zpátky do archivu, uběhla spousta času.")
+        ui.say(f"Chytíš se {genitive} niti a jdeš za ní.")
+        lose_piece(state, ui, text)
+        ui.say("Než se vymotáš zpátky do archivu, uběhne půl hodiny.")
         return ACTION_MINUTES + LOST_PENALTY
 
     return handler
 
 
 def describe(state: GameState) -> str:
-    parts = [
-        "Regály až ke stropu a na nich klubka všech barev a velikostí. Každé patří někomu, kdo uprostřed hovoru, "
-        "přednášky nebo života „ztratil nit“. Některé nitě se táhnou z klubek ven, přes podlahu, "
-        "a mizí ve zdi – tam, kde podle plánu budovy žádné dveře nejsou.",
-        "Čtyři nitě jsou napnuté víc než ostatní: červená, modrá, šedá a zlatá.",
-    ]
-    if "red_thread" in state.here():
-        parts.append("Konec červené niti leží na zemi, jako by na někoho čekal.")
-    elif state.has("red_thread"):
-        parts.append("Konec červené niti máš v kapse. Jemně tahá směrem ke zdi.")
-    return "\n".join(parts)
+    return (
+        "Regály plné klubek od lidí, kteří „ztratili nit“. Tři nitě se táhnou přes podlahu a mizí ve zdi: "
+        "červená, modrá a zlatá."
+    )
 
 
 def actions(state: GameState) -> list[Action]:
     return [
         Action("follow:red", "Jít po červené niti", _follow_red),
         Action("follow:blue", "Jít po modré niti", _follow_wrong("blue")),
-        Action("follow:grey", "Jít po šedé niti", _follow_wrong("grey")),
         Action("follow:gold", "Jít po zlaté niti", _follow_wrong("gold")),
-        Action("back", "Vrátit se k přepážce", go("counter")),
     ]

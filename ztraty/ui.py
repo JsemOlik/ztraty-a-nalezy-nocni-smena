@@ -1,10 +1,16 @@
-"""Vstup a výstup: rich konzole s animacemi pro hráče, skriptované UI pro testy."""
+"""Vstup a výstup: rich konzole s animacemi pro hráče, skriptované UI pro testy.
+
+Ve skutečném terminálu hra běží v alternativní obrazovce a každý tah překreslí
+celou obrazovku na místě: nahoře stav, pod ním místnost, pak co se právě stalo
+a nakonec nabídka. Bez terminálu (přesměrovaný výstup) se vše jen vypisuje za sebou.
+"""
 
 import os
 import sys
 import time
 from bisect import bisect_right
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 
 from rich.console import Console, RenderableType
 from rich.live import Live
@@ -15,12 +21,13 @@ from rich.text import Text
 from . import art
 from .actions import Action
 from .items import ITEMS
-from .state import MAX_POCKETS, GameState
+from .state import MAX_PIECES, MAX_POCKETS, GameState
 from .text import fmt_time, pieces_bar, transparency
 
 # Rychlost psaní ve znacích za sekundu; 0 = bez animace.
 SPEEDS = {"normální": 90, "rychlá": 260, "vypnutá": 0}
 FRAME = 1 / 60
+MAX_WIDTH = 96
 NIGHT_BAR_CELLS = 12
 
 # Prodleva po interpunkci, v násobcích jednoho znaku.
@@ -43,6 +50,13 @@ def pockets_summary(state: GameState) -> str:
 def night_bar(state: GameState) -> str:
     filled = min(NIGHT_BAR_CELLS, round(state.minutes / state.deadline * NIGHT_BAR_CELLS))
     return "▕" + "█" * filled + "░" * (NIGHT_BAR_CELLS - filled) + "▏"
+
+
+def credits_text() -> Text:
+    text = Text(justify="center", style="dim")
+    text.append(f"{art.CREDITS_LABEL} {art.CREDITS_NAME} · ")
+    text.append(art.CREDITS_SITE, style=f"bold link https://{art.CREDITS_SITE}")
+    return text
 
 
 class _SkipKeys:
@@ -96,13 +110,47 @@ def _schedule(plain: str) -> list[int]:
     return moments
 
 
+@dataclass
+class Scene:
+    title: str
+    text: str
+    picture: str | None
+    animate: bool
+    shown: bool = False
+
+
+@dataclass
+class Message:
+    text: Text
+    speed: float = 1.0
+    flicker: bool = False
+
+
 class ConsoleUI:
     def __init__(self, console: Console | None = None, speed: str = "normální"):
         self.console = console or Console(highlight=False)
-        interactive = self.console.is_terminal and sys.stdin.isatty()
-        self.speed = speed if interactive else "vypnutá"
+        self.interactive = self.console.is_terminal and sys.stdin.isatty()
+        self.speed = speed if self.interactive else "vypnutá"
         # Stisk klávesy přeskočí všechny animace až do další volby.
         self.skipping = False
+        self.scene: Scene | None = None
+        self.seen_titles: set[str] = set()
+        self.state: GameState | None = None
+        self.goal = ""
+        self.pending: list[Message] = []
+
+    def __enter__(self) -> "ConsoleUI":
+        if self.interactive:
+            self.console.set_alt_screen(True)
+        return self
+
+    def __exit__(self, *exc) -> None:
+        if self.interactive:
+            self.console.set_alt_screen(False)
+
+    @property
+    def width(self) -> int:
+        return min(self.console.width, MAX_WIDTH)
 
     # --- animace -----------------------------------------------------------
 
@@ -116,19 +164,19 @@ class ConsoleUI:
         return self.speed
 
     def _type(self, text: Text, render: Callable[[Text], RenderableType] = lambda t: t,
-              width: int | None = None, cps_factor: float = 1.0) -> None:
+              width: int | None = None, speed: float = 1.0) -> None:
         """Vypíše text postupně jako psací stroj. Libovolná klávesa animaci přeskočí."""
         if not self.cps:
-            self.console.print(render(text))
+            self.console.print(render(text), width=self.width)
             return
         # Text se zalomí předem, aby slova během psaní neskákala mezi řádky.
-        text = Text("\n").join(text.wrap(self.console, width or self.console.width))
+        text = Text("\n").join(text.wrap(self.console, width or self.width))
         if text.plain.count("\n") + 6 > self.console.height:
             # Živé překreslování by u textu vyššího než terminál zanechalo duplicitní řádky.
             self.console.print(render(text))
             return
         moments = _schedule(text.plain)
-        cps = self.cps * cps_factor
+        cps = self.cps * speed
         with _SkipKeys() as keys, Live(
             render(Text()), console=self.console, auto_refresh=False, vertical_overflow="visible"
         ) as live:
@@ -148,55 +196,100 @@ class ConsoleUI:
 
     def _reveal_art(self, picture: str, style: str) -> None:
         """Vykreslí obrázek řádek po řádku."""
-        lines = picture.strip("\n").split("\n")
         with _SkipKeys() as keys:
-            for line in lines:
+            for line in picture.strip("\n").split("\n"):
                 self.console.print(Text(line, style=style))
                 if self.cps and keys.pressed():
                     self.skipping = True
                 if self.cps:
-                    time.sleep(0.03 * SPEEDS["normální"] / self.cps)
+                    time.sleep(0.025 * SPEEDS["normální"] / self.cps)
 
-    def _flicker(self, text: Text, styles: Sequence[str], final: str, frames: int, delay: float) -> None:
+    def _flicker(self, text: str, styles: Sequence[str], final: str, frames: int, delay: float) -> None:
         if not self.cps:
-            self.console.print(Text(text.plain, style=final))
+            self.console.print(Text(text, style=final))
             return
-        with Live(Text(text.plain, style=styles[0]), console=self.console, auto_refresh=False) as live:
+        with Live(Text(text, style=styles[0]), console=self.console, auto_refresh=False) as live:
             for frame in range(frames):
-                live.update(Text(text.plain, style=styles[frame % len(styles)]), refresh=True)
+                live.update(Text(text, style=styles[frame % len(styles)]), refresh=True)
                 time.sleep(delay)
-            live.update(Text(text.plain, style=final), refresh=True)
+            live.update(Text(text, style=final), refresh=True)
+
+    # --- zprávy (ukážou se pod místností při dalším překreslení) -------------
+
+    def say(self, text: str) -> None:
+        self.pending.append(Message(Text.from_markup(text)))
+
+    def good(self, text: str) -> None:
+        self.pending.append(Message(Text(text, style="green")))
+
+    def bad(self, text: str) -> None:
+        self.pending.append(Message(Text(text, style="bold red")))
+
+    def sfx(self, text: str) -> None:
+        """Zvukový efekt: pomalu a kurzívou."""
+        self.pending.append(Message(Text(text, style="italic magenta"), speed=0.5))
+
+    def flicker(self, text: str) -> None:
+        """Text, který bliká a mizí – jako hráč, když ztrácí kousek sebe."""
+        self.pending.append(Message(Text(text, style="bold red"), flicker=True))
+
+    def head(self, text: str) -> None:
+        line = Text()
+        line.append("Hlava: ", style="bold yellow")
+        line.append(text, style="italic yellow")
+        self.pending.append(Message(line, speed=1.6))
+
+    def _flush_messages(self) -> None:
+        if not self.pending:
+            return
+        self.console.print()
+        for message in self.pending:
+            if message.flicker:
+                styles = ["bold red", "dim red", "bold red", "grey23", "dim red"]
+                self._flicker(message.text.plain, styles, "bold red", frames=10, delay=0.07)
+            else:
+                self._type(message.text, speed=message.speed)
+        self.pending.clear()
 
     # --- obrazovky ---------------------------------------------------------
 
+    def _clear(self) -> None:
+        if self.interactive:
+            self.console.clear()
+
     def title_screen(self) -> None:
+        self.scene = None
+        self._clear()
         self.console.print()
         self._reveal_art(art.TITLE, "bold magenta")
         # Zářivka nad přepážkou chvíli bliká, než chytne.
-        self._flicker(
-            Text(art.SUBTITLE.center(48)),
-            ["dim", "bold white", "dim", "dim", "bold white", "dim"],
-            "bold white",
-            frames=9,
-            delay=0.09,
-        )
+        flicker_styles = ["dim", "bold white", "dim", "dim", "bold white", "dim"]
+        self._flicker(art.SUBTITLE.center(48), flicker_styles, "bold white", frames=9, delay=0.09)
         self.console.print(Text("Textová hra o všem, co lidé ztratí".center(48), style="italic dim"))
+        self.console.print()
+        self.console.print(credits_text(), width=48, justify="center")
         if self.cps:
             self.console.print(Text("(Animaci textu přeskočíš libovolnou klávesou.)".center(48), style="dim"))
-        self.console.print()
 
-    def room(self, title: str, text: str, picture: str | None = None, animate: bool = True) -> None:
-        self.console.print()
-        if picture:
-            self._reveal_art(picture, "cyan")
-        render = lambda body: Panel(body, title=f"[bold cyan]{title}[/bold cyan]", border_style="cyan", padding=(0, 1))
-        body = Text.from_markup(text)
-        if animate:
-            self._type(body, render, width=self.console.width - 4, cps_factor=1.4)
-        else:
-            self.console.print(render(body))
+    def page(self, title: str, text: str) -> None:
+        """Samostatná stránka textu (úvod)."""
+        self.scene = None
+        self._clear()
+        render = lambda body: Panel(body, title=f"[bold cyan]{title}[/bold cyan]", border_style="cyan",
+                                    padding=(1, 2), width=self.width)
+        self._type(Text.from_markup(text), render, width=self.width - 6)
 
-    def hud(self, state: GameState) -> None:
+    def set_scene(self, state: GameState, title: str, text: str, picture: str | None, goal: str) -> None:
+        """Nastaví, co je na obrazovce za místnost. Vykreslí se až při další volbě."""
+        self.state, self.goal = state, goal
+        if self.scene and (self.scene.title, self.scene.text) == (title, text):
+            return
+        # Popis se píše animovaně jen při první návštěvě, pak už se jen ukáže.
+        self.scene = Scene(title, text, picture, animate=title not in self.seen_titles)
+        self.seen_titles.add(title)
+
+    def _header(self) -> None:
+        state = self.state
         left = state.deadline - state.minutes
         time_style = "bold red" if left <= 30 else "bold yellow" if left <= 60 else "bold"
         line = Text()
@@ -205,37 +298,52 @@ class ConsoleUI:
         line.append(f" {night_bar(state)} {fmt_time(state.deadline)}", style="dim")
         line.append("   Kousky sebe ", style="dim")
         line.append(pieces_bar(state), style="bold green" if state.pieces > 2 else "bold red")
-        line.append(f"   Kapsy ({len(state.pockets)}/{MAX_POCKETS}) ", style="dim")
-        line.append(pockets_summary(state))
-        self.console.print(line)
-        self.console.print(Text(transparency(state), style="italic dim"))
+        self.console.print(line, width=self.width)
+        pockets = Text()
+        pockets.append(f"Kapsy {len(state.pockets)}/{MAX_POCKETS}: ", style="dim")
+        pockets.append(pockets_summary(state))
+        self.console.print(pockets, width=self.width)
+        goal = Text()
+        goal.append("Úkol: ", style="bold yellow")
+        goal.append(self.goal, style="yellow")
+        self.console.print(goal, width=self.width)
+        if state.pieces < MAX_PIECES:
+            self.console.print(Text(transparency(state), style="italic dim"), width=self.width)
+        self.console.print(Rule(style="dim"), width=self.width)
 
-    def say(self, text: str) -> None:
-        self._type(Text.from_markup(text))
+    def _fits_with_art(self, scene: Scene, menu_lines: int) -> bool:
+        def lines(text: Text, width: int) -> int:
+            return len(text.wrap(self.console, width))
 
-    def good(self, text: str) -> None:
-        self._type(Text(text, style="green"))
+        art_lines = scene.picture.strip("\n").count("\n") + 1
+        header = 5 + (self.state.pieces < MAX_PIECES)
+        panel = lines(Text.from_markup(scene.text), self.width - 4) + 2
+        messages = sum(lines(m.text, self.width) for m in self.pending) + bool(self.pending)
+        return header + art_lines + panel + messages + menu_lines + 4 <= self.console.height
 
-    def bad(self, text: str) -> None:
-        self._type(Text(text, style="bold red"))
-
-    def sfx(self, text: str) -> None:
-        """Zvukový efekt: pomalu a kurzívou."""
-        self._type(Text(text, style="italic magenta"), cps_factor=0.5)
-
-    def flicker(self, text: str) -> None:
-        """Text, který bliká a mizí – jako hráč, když ztrácí kousek sebe."""
-        self._flicker(Text(text), ["bold red", "dim red", "bold red", "grey23", "dim red"], "bold red", 10, 0.07)
-
-    def head(self, text: str) -> None:
-        line = Text()
-        line.append("Hlava: ", style="bold yellow")
-        line.append(text, style="italic yellow")
-        self._type(line, cps_factor=1.6)
+    def _draw_scene(self, menu_lines: int) -> None:
+        scene = self.scene
+        first_time = scene.animate and not scene.shown
+        self._header()
+        if scene.picture and (not self.interactive or self._fits_with_art(scene, menu_lines)):
+            if first_time:
+                self._reveal_art(scene.picture, "cyan")
+            else:
+                self.console.print(Text(scene.picture.strip("\n"), style="cyan"))
+        render = lambda body: Panel(body, title=f"[bold cyan]{scene.title}[/bold cyan]", border_style="cyan",
+                                    padding=(0, 1), width=self.width)
+        body = Text.from_markup(scene.text)
+        if first_time:
+            self._type(body, render, width=self.width - 4, speed=1.4)
+        else:
+            self.console.print(render(body))
+        scene.shown = True
 
     def ending(self, number: int, title: str, text: str, footer: str, picture: str | None = None) -> None:
+        self.scene = None
+        self._clear()
+        self._flush_messages()
         self.console.print()
-        self.console.print(Rule(style="magenta"))
         if picture:
             self._reveal_art(picture, "magenta")
         render = lambda body: Panel(
@@ -244,8 +352,10 @@ class ConsoleUI:
             subtitle=footer,
             border_style="magenta",
             padding=(1, 2),
+            width=self.width,
         )
-        self._type(Text.from_markup(text), render, width=self.console.width - 6, cps_factor=0.9)
+        self._type(Text.from_markup(text), render, width=self.width - 6, speed=0.9)
+        self.console.print(credits_text(), width=self.width, justify="center")
 
     def pause(self) -> None:
         self.skipping = False
@@ -253,18 +363,37 @@ class ConsoleUI:
 
     def farewell(self, text: str) -> None:
         self.console.print(text)
+        self.console.print(credits_text(), width=48, justify="center")
 
     def choose(self, actions: Sequence[Action], prompt: str = "Co uděláš?") -> Action:
         self.skipping = False
+        numbered = [action for action in actions if not action.hotkey]
+        hotkeys = {action.hotkey: action for action in actions if action.hotkey}
+        menu_lines = len(numbered) + (2 if hotkeys else 0)
+        if self.scene:
+            if self.interactive:
+                # Celá obrazovka se překreslí na místě, nic se nehromadí pod sebou.
+                self._clear()
+                self._draw_scene(menu_lines)
+            elif not self.scene.shown:
+                self._draw_scene(menu_lines)
+            else:
+                self._header()
+        self._flush_messages()
         self.console.print()
-        for number, action in enumerate(actions, start=1):
+        for number, action in enumerate(numbered, start=1):
             label = f"[dim]{action.label}[/dim]" if action.cost == 0 else action.label
             self.console.print(f"  [bold]{number:>2}[/bold]) {label}")
+        if hotkeys:
+            footer = "   ·   ".join(f"[bold]{key}[/bold] {action.label}" for key, action in hotkeys.items())
+            self.console.print(f"\n  [dim]{footer}[/dim]")
         while True:
-            answer = self.console.input(f"[bold]{prompt}[/bold] ").strip()
-            if answer.isdigit() and 1 <= int(answer) <= len(actions):
-                return actions[int(answer) - 1]
-            self.console.print(f"[red]Napiš číslo od 1 do {len(actions)}.[/red]")
+            answer = self.console.input(f"[bold]{prompt}[/bold] ").strip().lower()
+            if answer.isdigit() and 1 <= int(answer) <= len(numbered):
+                return numbered[int(answer) - 1]
+            if answer in hotkeys:
+                return hotkeys[answer]
+            self.console.print(f"[red]Napiš číslo od 1 do {len(numbered)}.[/red]")
 
 
 class ScriptedUI:
@@ -275,6 +404,13 @@ class ScriptedUI:
     def __init__(self, script: Sequence[str | Callable[[Sequence[Action]], Action]]):
         self.script = list(script)
         self.log: list[str] = []
+        self.scene: tuple[str, str] | None = None
+
+    def __enter__(self) -> "ScriptedUI":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        pass
 
     def _out(self, text: str) -> None:
         self.log.append(text)
@@ -285,13 +421,16 @@ class ScriptedUI:
     def title_screen(self) -> None:
         self._out(art.TITLE)
 
-    def room(self, title: str, text: str, picture: str | None = None, animate: bool = True) -> None:
+    def page(self, title: str, text: str) -> None:
         self._out(f"[{title}] {text}")
 
-    def hud(self, state: GameState) -> None:
-        self._out(f"{fmt_time(state.minutes)} {pieces_bar(state)} {pockets_summary(state)}")
+    def set_scene(self, state: GameState, title: str, text: str, picture: str | None, goal: str) -> None:
+        if self.scene != (title, text):
+            self.scene = (title, text)
+            self._out(f"[{title}] {text}")
+        self._out(f"{fmt_time(state.minutes)} {pieces_bar(state)} {pockets_summary(state)} | Úkol: {goal}")
 
-    say = good = bad = sfx = flicker = _out
+    say = good = bad = sfx = flicker = farewell = _out
 
     def head(self, text: str) -> None:
         self._out(f"Hlava: {text}")
