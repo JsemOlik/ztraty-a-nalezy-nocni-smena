@@ -40,10 +40,23 @@ Když výstup nejde do terminálu (třeba při přesměrování do souboru), ani
 
 Hra se vejde do jedné obrazovky a každý tah ji překreslí na místě. Po skončení se terminál vrátí do původního stavu. Hra má **osm konců** – některé vtipné, některé temné a jeden tajný.
 
+## Soubory
+
+| Soubor | Co v něm je |
+| --- | --- |
+| `main.py` | Spouští hru (a zkontroluje, že je nainstalovaný `rich`). |
+| `game.py` | Hlavní smyčka: ukaž místnost, nech hráče vybrat, proveď volbu, posuň čas. |
+| `world.py` | Stav hry (jeden slovník), předměty a pomocné funkce. |
+| `rooms.py` | Všechny místnosti: popisy, volby a co se stane po výběru. |
+| `screen.py` | Všechno, co se vykresluje: obrazovka, nabídka, animace. |
+| `texts.py` | Delší texty: úvod, nápověda, deník, konce, komentáře hlavy, úkol. |
+| `art.py` | ASCII obrázky a autor. |
+| `tests.py` | Testy. |
+
 ## Testy
 
 ```bash
-python3 -m unittest
+python3 tests.py
 ```
 
 ## Autor

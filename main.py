@@ -3,16 +3,14 @@
 import sys
 
 try:
-    import rich  # noqa: F401
+    import rich
 except ModuleNotFoundError:
-    sys.exit(
-        "Chybí knihovna rich. Nainstaluj ji:\n"
-        "  pip install -r requirements.txt\n"
-        "nebo hru spusť přes uv:\n"
-        "  uv run --with-requirements requirements.txt main.py"
-    )
+    print("Chybí knihovna rich. Nainstaluj ji:")
+    print("  pip install -r requirements.txt")
+    print("nebo hru spusť přes uv:")
+    print("  uv run --with-requirements requirements.txt main.py")
+    sys.exit(1)
 
-from ztraty.game import main
+import game
 
-if __name__ == "__main__":
-    main()
+game.main()
