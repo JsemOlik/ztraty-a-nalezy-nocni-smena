@@ -28,7 +28,7 @@ def noop(state: GameState, ui) -> None:
 def lose_piece(state: GameState, ui, text: str) -> None:
     state.pieces -= 1
     ui.bad(text)
-    ui.bad("Ztrácíš kousek sebe.")
+    ui.flicker("Ztrácíš kousek sebe.")
     if state.pieces > 0:
         ui.say(transparency(state))
 

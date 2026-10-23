@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from . import art
 from .state import GameState
 from .text import fmt_time
 
@@ -140,4 +141,4 @@ def show(state: GameState, ui) -> None:
         return
     ending = ENDINGS[state.ending]
     footer = f"Čas: {fmt_time(state.minutes)} · Kousky sebe: {max(state.pieces, 0)}/5"
-    ui.ending(ending.number, ending.title(state), ending.text(state), footer)
+    ui.ending(ending.number, ending.title(state), ending.text(state), footer, art.ENDINGS[state.ending])

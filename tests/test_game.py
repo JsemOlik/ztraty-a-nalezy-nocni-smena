@@ -1,7 +1,10 @@
 import random
 import unittest
 
+from ztraty import art
+from ztraty.endings import ENDINGS
 from ztraty.game import pass_time, play
+from ztraty.rooms import ROOMS
 from ztraty.state import MAX_PIECES, SHIFT_END, GameState
 from ztraty.ui import ScriptedUI
 
@@ -135,6 +138,10 @@ class MechanicTests(unittest.TestCase):
     def test_office_locked_without_face(self):
         state, _ = run(["go_office", "quit"])
         self.assertEqual(state.location, "counter")
+
+    def test_every_room_and_ending_has_art(self):
+        self.assertEqual(set(art.ROOMS), set(ROOMS))
+        self.assertEqual(set(art.ENDINGS), set(ENDINGS))
 
     def test_head_comments_from_pocket(self):
         _, ui = run(GET_HEAD + ["bell", "quit"])

@@ -20,10 +20,10 @@ JOURNAL = """[bold]Deník služeb[/bold] – poslední zapsané stránky:
 Písmo posledního zápisu je bledší než ostatní, jako by inkoust mizel spolu s pisatelem."""
 
 BELL_LINES = [
-    "Cink. Zvuk se rozběhne chodbami a vrátí se o chvíli později, trochu jiný. Jako by si ho někdo vypůjčil.",
-    "Cink. Odněkud z hloubi úřadu se ozve: „Hned jsem u vás!“ Nikdo nepřijde.",
-    "Cink. Ve skladu deštníků na chvíli přestane pršet. Pak začne znovu, o to víc.",
-    "Cink. Zvonek zní jako tramvaj, na kterou jsi kdysi nestihl(a) doběhnout.",
+    "Zvuk se rozběhne chodbami a vrátí se o chvíli později, trochu jiný. Jako by si ho někdo vypůjčil.",
+    "Odněkud z hloubi úřadu se ozve: „Hned jsem u vás!“ Nikdo nepřijde.",
+    "Ve skladu deštníků na chvíli přestane pršet. Pak začne znovu, o to víc.",
+    "Zvonek zní jako tramvaj, na kterou jsi kdysi nestihl(a) doběhnout.",
 ]
 
 
@@ -56,6 +56,7 @@ def _read_journal(state: GameState, ui) -> None:
 
 
 def _phone(state: GameState, ui) -> None:
+    ui.sfx("Tůůů… tůůů… cvak.")
     ui.say(
         "Zvedneš zaprášené sluchátko. Chvíli je slyšet jen šum, jako když někdo dýchá přes celé město. "
         "Pak hlas, který odněkud znáš, ale nevíš odkud:"
@@ -65,6 +66,7 @@ def _phone(state: GameState, ui) -> None:
 
 
 def _bell(state: GameState, ui) -> None:
+    ui.sfx("* CINK *")
     line = state.rng.choice(BELL_LINES)
     ui.say(line.replace("nestihl(a)", state.g("nestihl", "nestihla")))
 
@@ -106,6 +108,7 @@ def _umbrellas(state: GameState, ui) -> None:
         state.flags.add("umbrellas_unlocked")
         ui.say("Klíč se v zámku otočí ztuha, jako by zrezivěl. Dveře se otevřou a ty ucítíš vůni mokrého asfaltu.")
     state.location = "umbrellas"
+    ui.sfx("Šššššššššš…")
     if state.has("umbrella"):
         ui.say("Rozevřeš suchý deštník. Déšť po něm bubnuje, ale na tebe nedopadne ani kapka.")
     else:
@@ -130,6 +133,8 @@ def _office(state: GameState, ui) -> None:
 
 def _cellar(state: GameState, ui) -> None:
     state.location = "cellar"
+    if "headless_calm" not in state.flags:
+        ui.sfx("cup cup cup… cup… cupcupcup…")
     ui.say("Sejdeš po vrzajících schodech do sklepa. Světlo shora po pár krocích vzdá svou práci.")
 
 

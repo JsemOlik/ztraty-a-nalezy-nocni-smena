@@ -61,6 +61,7 @@ def _listen(jar: Jar):
 
 def _open(jar: Jar):
     def handler(state: GameState, ui) -> None:
+        ui.sfx("Pšššš!")
         if jar.id == "curses":
             lose_piece(
                 state,

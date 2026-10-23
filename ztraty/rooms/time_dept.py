@@ -25,6 +25,7 @@ def _clock_puzzle(state: GameState, ui) -> int | None:
         for index, (face, time) in enumerate(zip(faces, times))
     ]
     state.rng.shuffle(options)
+    ui.sfx("Tik. Tak. Tik. Tak. Tik.")
     ui.say(
         "Procházíš mezi hodinami a nasloucháš. Většina z nich lže – některé o minutu, některé o celý život. "
         "Jen jedny jdou přesně tak, jak jde tvoje noc."
@@ -39,6 +40,7 @@ def _clock_puzzle(state: GameState, ui) -> int | None:
         if not state.give_or_drop("lost_hour"):
             ui.say("Kapsy máš plné, a tak ztracená hodina tiše cinkne o podlahu u tvých nohou.")
         return None
+    ui.sfx("CRRRRRRR! Kuku! Kuku! Kuku!")
     ui.bad(
         "Sáhneš na špatné hodiny. Rozdrnčí se, posměšně zakukají a ukousnou ti čtvrthodinu. "
         "Ručičky na všech ostatních ciferníkách poskočí dopředu."

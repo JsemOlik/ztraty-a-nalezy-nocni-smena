@@ -1,6 +1,8 @@
 """Hlavní smyčka hry: místnost, nabídka, akce, plynutí času."""
 
-from . import endings, head
+import argparse
+
+from . import art, endings, head
 from .actions import Action, item_actions, lose_piece, noop
 from .items import ITEMS
 from .rooms import ROOMS
@@ -38,14 +40,14 @@ def intro(state: GameState) -> str:
     )
 
 
-def show_room(state: GameState, ui) -> None:
+def show_room(state: GameState, ui, animate: bool = False) -> None:
     room = ROOMS[state.location]
     text = room.describe(state)
     native = getattr(room, "NATIVE_ITEMS", ())
     loose = [ITEMS[item_id].name for item_id in dict.fromkeys(state.here()) if item_id not in native]
     if loose:
         text += "\nNa zemi leží: " + ", ".join(loose) + "."
-    ui.room(room.TITLE, text)
+    ui.room(room.TITLE, text, art.ROOMS.get(state.location), animate)
 
 
 def _look(state: GameState, ui) -> None:
@@ -60,10 +62,15 @@ def _quit(state: GameState, ui) -> None:
     state.ending = "quit"
 
 
-def meta_actions() -> list[Action]:
+def _cycle_speed(state: GameState, ui) -> None:
+    ui.say(f"Rychlost textu: {ui.cycle_speed()}.")
+
+
+def meta_actions(ui) -> list[Action]:
     return [
         Action("look", "Rozhlédnout se", _look, cost=0),
         Action("help", "Nápověda", _help, cost=0),
+        Action("speed", f"Rychlost textu: {ui.speed}", _cycle_speed, cost=0),
         Action("quit", "Ukončit hru", _quit, cost=0),
     ]
 
@@ -109,13 +116,14 @@ def pass_time(state: GameState, ui, minutes: int) -> None:
         )
     for threshold, warning in TIME_WARNINGS.items():
         if left_before > threshold >= left:
+            ui.sfx("Bim… bam… bim…")
             ui.bad(warning)
     if state.has("head"):
         ui.head(head.comment(state))
 
 
 def new_game(ui) -> GameState:
-    ui.title("Ztráty a nálezy: noční směna", "Textová hra o všem, co lidé ztratí")
+    ui.title_screen()
     choice = ui.choose(
         [
             Action("male", "Nastupuji jako noční úředník", noop, cost=0),
@@ -131,12 +139,15 @@ def new_game(ui) -> GameState:
 
 def play(ui, state: GameState) -> GameState:
     shown = None
+    seen: set[str] = set()
     while state.ending is None:
         if shown != state.location:
-            show_room(state, ui)
+            # Popis se píše animovaně jen při první návštěvě, pak už se jen ukáže.
+            show_room(state, ui, animate=state.location not in seen)
+            seen.add(state.location)
             shown = state.location
         ui.hud(state)
-        actions = ROOMS[state.location].actions(state) + item_actions(state) + meta_actions()
+        actions = ROOMS[state.location].actions(state) + item_actions(state) + meta_actions(ui)
         action = ui.choose(actions)
         spent = action.handler(state, ui)
         spent = action.cost if spent is None else spent
@@ -148,8 +159,14 @@ def play(ui, state: GameState) -> GameState:
     return state
 
 
-def main() -> None:
-    ui = ConsoleUI()
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Ztráty a nálezy: noční směna")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--rychle", action="store_true", help="rychlejší psaní textu")
+    group.add_argument("--bez-animaci", action="store_true", help="vypne animace textu")
+    args = parser.parse_args(argv)
+    speed = "vypnutá" if args.bez_animaci else "rychlá" if args.rychle else "normální"
+    ui = ConsoleUI(speed=speed)
     try:
         while True:
             state = play(ui, new_game(ui))
@@ -162,4 +179,4 @@ def main() -> None:
             if again.key == "end":
                 break
     except (KeyboardInterrupt, EOFError):
-        ui.say("\nSměna přerušena. Na shledanou!")
+        ui.farewell("\nSměna přerušena. Na shledanou!")

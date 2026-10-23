@@ -11,7 +11,24 @@ pip install -r requirements.txt
 python3 main.py
 ```
 
-Hra používá knihovnu [rich](https://github.com/Textualize/rich) na barvy a rámečky. Terminál by měl umět UTF-8.
+S [uv](https://docs.astral.sh/uv/) to jde i bez ručního instalování:
+
+```bash
+uv run --with-requirements requirements.txt main.py
+```
+
+Hra používá knihovnu [rich](https://github.com/Textualize/rich) na barvy, rámečky a animace. Terminál by měl umět UTF-8.
+
+### Animace
+
+Text se vypisuje jako na psacím stroji. **Libovolná klávesa** přeskočí animace až do další volby. Rychlost se dá přepnout přímo ve hře (volba *Rychlost textu*) nebo při spuštění:
+
+```bash
+python3 main.py --rychle        # rychlejší psaní
+python3 main.py --bez-animaci   # bez animací
+```
+
+Když výstup nejde do terminálu (třeba při přesměrování do souboru), animace se vypnou samy.
 
 ## Jak se hraje
 
